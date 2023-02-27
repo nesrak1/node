@@ -50,4 +50,4 @@ jobs:
       - name: Build
         run: ./vcbuild.bat
       - name: check dir
-        run: tree
+        run: tree %CD% /F
