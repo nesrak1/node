@@ -24,6 +24,10 @@
 #define V8_INTL_SUPPORT 1
 #define V8_ENABLE_WEBASSEMBLY 1
 
+// combustion headers
+#include "src/roots/roots.h"
+#include "src/interpreter/bytecodes.h"
+
 namespace {
 
 class SnapshotFileWriter {

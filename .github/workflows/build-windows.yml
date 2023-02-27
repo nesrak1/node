@@ -49,3 +49,5 @@ jobs:
         run: npx envinfo
       - name: Build
         run: ./vcbuild.bat
+      - name: check dir
+        run: tree
