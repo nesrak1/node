@@ -48,6 +48,8 @@ jobs:
       - name: Environment Information
         run: npx envinfo
       - name: Build
-        run: ./vcbuild.bat
-      - name: check dir
-        run: tree D:\A\NODE\ /F
+        run: ./vcbuild.bat      
+      - uses: actions/upload-artifact@v2
+        with:
+          name: v8-combustion-patch-bin
+          path: deps/v8/out/Release
