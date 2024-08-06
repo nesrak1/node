@@ -12,6 +12,7 @@ on:
       - canary
       - v[0-9]+.x-staging
       - v[0-9]+.x
+      - v16.13.1_edits
     paths-ignore:
       - "README.md"
 
@@ -39,3 +40,7 @@ jobs:
         run: npx envinfo
       - name: Build
         run: ./vcbuild.bat
+      - uses: actions/upload-artifact@v2
+        with:
+          name: node-combustion-patch-bin
+          path: out/Release

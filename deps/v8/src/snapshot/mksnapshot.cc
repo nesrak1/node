@@ -20,6 +20,12 @@
 #include "src/snapshot/embedded/embedded-file-writer.h"
 #include "src/snapshot/snapshot.h"
 #include "src/snapshot/startup-serializer.h"
+#define V8_INTL_SUPPORT 1
+#define V8_ENABLE_WEBASSEMBLY 1
+
+// combustion headers
+#include "src/roots/roots.h"
+#include "src/interpreter/bytecodes.h"
 
 namespace {
 
@@ -214,6 +220,157 @@ void MaybeSetCounterFunction(v8::Isolate* isolate) {
 
 }  // namespace
 
+// combustion export start
+#define VAL(str) #str
+#define TOSTRING(str) VAL(str)
+// Make a FOREACH macro
+#define FE_0(WHAT)
+#define FE_1(WHAT, X) WHAT(X)
+#define FE_2(WHAT, X, ...) WHAT(X) FE_1(WHAT, __VA_ARGS__)
+#define FE_3(WHAT, X, ...) WHAT(X) FE_2(WHAT, __VA_ARGS__)
+#define FE_4(WHAT, X, ...) WHAT(X) FE_3(WHAT, __VA_ARGS__)
+#define FE_5(WHAT, X, ...) WHAT(X) FE_4(WHAT, __VA_ARGS__)
+//... repeat as needed
+
+#define GET_MACRO(_0, _1, _2, _3, _4, _5, NAME, ...) NAME
+#define FOR_EACH(action, ...)                                                  \
+  GET_MACRO(_0, __VA_ARGS__, FE_5, FE_4, FE_3, FE_2, FE_1, FE_0)               \
+  (action, __VA_ARGS__)
+
+#define TOSTRING_NS(X) TOSTRING(X)
+
+const char* const roots[] = {
+#define DECL(type, name, CamelName) TOSTRING(type), TOSTRING(name), TOSTRING(CamelName),
+  ROOT_LIST(DECL)
+#undef DECL
+
+  "<end>",
+  "<end>",
+  "<end>"
+};
+
+const char* const opcodes[] = {
+#define DECLARE_BYTECODE(Name, ImplicitRegisterUse, ...)                       \
+  "OpcodeType." TOSTRING(Name), TOSTRING(ImplicitRegisterUse), FOR_EACH(TOSTRING_NS, __VA_ARGS__) "",  \
+      "<next>",
+  BYTECODE_LIST(DECLARE_BYTECODE)
+#undef DECLARE_BYTECODE
+  "<end>"
+};
+
+void replace_all(std::string& s,
+                 std::string const& toReplace,
+                 std::string const& replaceWith) {
+  std::string buf;
+  std::size_t pos = 0;
+  std::size_t prevPos;
+
+  // Reserves rough estimate of final size of string.
+  buf.reserve(s.size());
+
+  while (true) {
+    prevPos = pos;
+    pos = s.find(toReplace, pos);
+    if (pos == std::string::npos) break;
+    buf.append(s, prevPos, pos - prevPos);
+    buf += replaceWith;
+    pos += toReplace.size();
+  }
+
+  buf.append(s, prevPos, s.size() - prevPos);
+  s.swap(buf);
+}
+
+int combustion_main()
+{
+  int idx = 0;
+  printf("// roots\n");
+  printf("public enum Root\n");
+  printf("{\n");
+  while (1) {
+    if (roots[idx] == "<end>" || roots[idx + 1] == "<end>" ||
+        roots[idx + 2] == "<end>")
+      break;
+
+    printf("    %s,\n", roots[idx + 2]);
+    idx += 3;
+  }
+  printf("}\n");
+  printf("\n");
+
+  idx = 0;
+  printf("// root type map\n");
+  printf("public Dictionary<Root, string> RootTypeLookup = new Dictionary<Root, string>()\n");
+  printf("{\n");
+  while (1) {
+    if (roots[idx] == "<end>" || roots[idx + 1] == "<end>" ||
+        roots[idx + 2] == "<end>")
+      break;
+
+    printf("    { Root.%s, \"%s\" },\n", roots[idx + 2], roots[idx]);
+    idx += 3;
+  }
+  printf("};\n");
+  printf("\n");
+
+
+  idx = 0;
+  printf("// opcodes\n");
+  printf("public enum OpcodeType\n");
+  printf("{\n");
+  std::string opcodeType("OpcodeType.");
+  while (1) {
+    if (opcodes[idx] == "<end>") break;
+
+    std::string thisString = std::string(opcodes[idx]);
+    if (thisString.find(opcodeType) != std::string::npos) {
+      thisString = thisString.substr(opcodeType.size());
+      printf("    %s,\n", thisString.c_str());
+    }
+
+    idx++;
+  }
+  printf("}\n");
+  printf("\n");
+
+
+  idx = 0;
+  printf("// opcode infos\n");
+  printf("private void CreateOpcodes()\n");
+  printf("{\n");
+  printf("    V(");
+  while (1) {
+    if (opcodes[idx] == "<end>") break;
+
+    std::string thisString = std::string(opcodes[idx]);
+    replace_all(thisString, "ImplicitRegisterUse::k", "ImplicitRegisterUse.");
+    replace_all(thisString, "OperandType::k", "OperandType.");
+
+    if (opcodes[idx + 1] == "<next>") {
+      printf("%s", thisString.c_str());
+      printf(");\n");
+      idx += 2;
+      if (opcodes[idx] != "<end>")
+        printf("    V(");
+    } else {
+      if (opcodes[idx + 1] == "" && opcodes[idx + 2] == "<next>") {
+        printf("%s", thisString.c_str());
+        printf(");\n");
+        idx += 3;
+        if (opcodes[idx] != "<end>")
+          printf("    V(");
+      } else {
+        printf("%s, ", thisString.c_str());
+        idx++;
+      }
+    }
+  }
+  printf("}\n");
+
+  return 0;
+}
+// combustion export end
+
 int main(int argc, char** argv) {
   v8::base::EnsureConsoleOutput();
 
@@ -233,6 +390,11 @@ int main(int argc, char** argv) {
   if (result > 0 || (argc > 3)) {
     i::PrintF(stdout, "%s", usage.c_str());
     return result;
+  }
+  
+  if (argc >= 2 && strcmp(argv[1], "generate_combustion_info") != 0) {
+    combustion_main();
+    return 0;
   }
 
   i::CpuFeatures::Probe(true);
