@@ -19,10 +19,6 @@ on:
       - README.md
       - .github/**
       - '!.github/workflows/build-windows.yml'
-    - uses: actions/upload-artifact@v4
-      with:
-        name: node-combustion-patch-bin
-        path: out/Release
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -54,3 +50,7 @@ jobs:
         run: npx envinfo
       - name: Build
         run: ./vcbuild.bat
+      - uses: actions/upload-artifact@v2
+        with:
+          name: node-combustion-patch-bin
+          path: out/Release
